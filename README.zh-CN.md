@@ -24,14 +24,14 @@
 
 ---
 
-## 使用已经编译好的包(新手)
+## 使用已经编译好的程序一键运行
 1. 从发布页面下载编译好的程序包：[poly_5min_bot.zip](https://github.com/rvenandowsley/Polymarket-crypto-5min-arbitrage-bot/releases/download/V1.3/poly_5min_bot.zip)
 2. 放到云服务器上面，需要确保所在地域能够被polymarket允许交易
 3. 配置好.env中前面的几个空白参数，参数由polymarket官网导出
 4. linux运行：`./poly_5min_bot`
 5. windows运行 `poly_5min_bot.exe`
 
-## 快速开始
+## 自主编译
 
 ```bash
 # 1. 安装 Rust（如未安装）、克隆项目、进入目录
