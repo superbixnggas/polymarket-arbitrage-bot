@@ -81,6 +81,183 @@ flowchart TD
 
 ---
 
+## System Architecture
+
+```mermaid
+flowchart TB
+    subgraph External["External Systems"]
+        Poly[Polymarket API]
+        Chain[Polygon Blockchain]
+        CEX[Price Feeds\nBinance/Coinbase]
+    end
+
+    subgraph Bot["Rust Arbitrage Bot"]
+        subgraph Core["Core Modules"]
+            Config[Config Manager]
+            Logger[Logging System]
+        end
+
+        subgraph Market["Market Layer"]
+            Discover[Market Discovery]
+            Monitor[Order Book Monitor]
+            Prices[Price Calculator]
+        end
+
+        subgraph Strategy["Strategy Layer"]
+            Detect[Arbitrage Detector]
+            Risk[Risk Manager]
+            Sizing[Position Sizing]
+        end
+
+        subgraph Execution["Execution Layer"]
+            Executor[Trade Executor]
+            Orders[Order Manager]
+            Signer[Transaction Signer]
+        end
+
+        subgraph Position["Position Layer"]
+            Tracker[Position Tracker]
+            Merge[Position Merger]
+        end
+    end
+
+    Config --> Discover
+    Logger --> Monitor
+    Discover --> Monitor
+    Monitor --> Prices
+    Prices --> Detect
+    Detect --> Risk
+    Risk --> Sizing
+    Sizing --> Executor
+    Executor --> Orders
+    Orders --> Signer
+    Signer --> Poly
+    Poly --> Chain
+    Monitor --> Tracker
+    Tracker --> Merge
+
+    Poly -.->|Market Data| Monitor
+    CEX -.->|Reference Prices| Prices
+    Chain -.->|Tx Confirm| Orders
+```
+
+### Architecture Description
+
+1. **Market Layer**: Discovers markets and monitors order books in real-time
+2. **Strategy Layer**: Analyzes opportunities and manages risk exposure
+3. **Execution Layer**: Signs and submits transactions to Polymarket
+4. **Position Layer**: Tracks open positions and merges redeemable positions
+
+---
+
+## Execution Flow
+
+```mermaid
+sequenceDiagram
+    participant Timer as Tokio Timer
+    participant Engine as Strategy Engine
+    participant API as Polymarket API
+    participant Risk as Risk Manager
+    participant Exec as Executor
+    participant Chain as Polygon RPC
+
+    loop Every 500ms
+        Timer->>Engine: Tick
+
+        Engine->>API: GET /markets/{btc_5min_id}
+        API-->>Engine: OrderBook Data
+
+        Engine->>Engine: Calculate YES + NO Spread
+
+        alt Spread < Threshold
+            Engine->>Engine: Log: No Opportunity
+        else Spread >= Threshold
+            Engine->>Risk: Check Risk Limits
+
+            alt Risk Approved
+                Risk->>Exec: Approve Trade
+                Exec->>API: POST /order (YES)
+                API-->>Exec: Order ID
+
+                par YES Order
+                    Exec->>API: POST /order (NO)
+                    API-->>Exec: Order ID
+                and Wait for Fill
+                    API->>Chain: Match & Settle
+                    Chain-->>Exec: Transaction Hash
+                end
+
+                Exec->>Engine: Trade Confirmed
+            else Risk Rejected
+                Engine->>Engine: Log: Risk Limit Exceeded
+            end
+        end
+    end
+```
+
+### Sequence Description
+
+1. Timer triggers every 500ms for market polling
+2. Engine fetches order book from Polymarket API
+3. Calculates spread between YES and NO prices
+4. If arbitrage opportunity detected, checks risk limits
+5. If approved, executes both YES and NO orders
+6. Confirms transaction on Polygon blockchain
+
+---
+
+## Bot States
+
+```mermaid
+stateDiagram-v2
+    [*] --> Initializing
+
+    Initializing --> LoadingConfig: Load .env
+    LoadingConfig --> Connecting: Connect API
+    Connecting --> Scanning: Ready
+
+    state Scanning {
+        [*] --> Monitoring
+        Monitoring --> Fetching: Get OrderBook
+        Fetching --> Calculating: Price Ready
+        Calculating --> Monitoring: No Opportunity
+        Calculating --> Signaling: Opportunity Found
+        Signaling --> Monitoring: Trade Skipped
+    }
+
+    state Executing {
+        [*] --> Submitting
+        Submitting --> Pending: Order Placed
+        Pending --> Filled: Both Filled
+        Pending --> Failed: Rejected/Timeout
+        Failed --> Scanning: Retry Next Cycle
+    }
+
+    state Managing {
+        [*] --> Holding
+        Holding --> Merging: Interval Reached
+        Merging --> Holding: Merge Complete
+        Holding --> Settled: Market Expired
+    }
+
+    Scanning --> Executing: Signal Detected
+    Executing --> Managing: Order Filled
+    Managing --> Scanning: Next Market Cycle
+
+    Scanning --> [*]: Stopped
+    Managing --> [*]: Stopped
+```
+
+### State Description
+
+1. **Initializing**: Bot loads configuration and connects to APIs
+2. **Scanning**: Continuously monitors order books for opportunities
+3. **Executing**: Submits orders when arbitrage detected
+4. **Managing**: Tracks positions and merges when possible
+5. **Settled**: Market expired, ready for next cycle
+
+---
+
 <img width="1027" height="788" alt="image" src="https://github.com/user-attachments/assets/7ea3f755-5afa-4e4c-939d-6532e76cdac0" />
 
 ---
