@@ -1,1 +1,2 @@
-*.html linguist-documentation=false linguist-vendored=false
+*.html linguist-documentation linguist-vendored
+docs/ linguist-documentation
