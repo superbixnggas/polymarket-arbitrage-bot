@@ -1,5 +1,10 @@
 # poly_5min_bot
 
+[![CI](https://github.com/superbixnggas/polymarket-arbitrage-bot/actions/workflows/ci.yml/badge.svg)](https://github.com/superbixnggas/polymarket-arbitrage-bot/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/superbixnggas/polymarket-arbitrage-bot/actions/workflows/codeql.yml/badge.svg)](https://github.com/superbixnggas/polymarket-arbitrage-bot/actions/workflows/codeql.yml)
+[![License](https://img.shields.io/github/license/superbixnggas/polymarket-arbitrage-bot)](https://github.com/superbixnggas/polymarket-arbitrage-bot)
+[![Rust](https://img.shields.io/badge/language-Rust-DEA584)](https://www.rust-lang.org/)
+
 **English** | [中文](README.zh-CN.md)
 
 The program is already in permanent use; the license.key is the permanent license, so please don't ask me for the license certificate again.
@@ -15,11 +20,64 @@ A Rust arbitrage bot for [Polymarket](https://polymarket.com) crypto “Up or Do
 
 ## Features
 
-- **Market discovery**: Fetches “Up/Down” 5-minute markets (e.g. `btc-updown-5m-1770972300`) from Gamma API by symbol and 5-min UTC window.
+- **Market discovery**: Fetches "Up/Down" 5-minute markets (e.g. `btc-updown-5m-1770972300`) from Gamma API by symbol and 5-min UTC window.
 - **Order book monitoring**: Subscribes to CLOB order books, detects when `yes_ask + no_ask < 1` (arbitrage opportunity).
 - **Arbitrage execution**: Places YES and NO orders (GTC/GTD/FOK/FAK), with configurable slippage, size limits, and execution threshold.
 - **Risk management**: Tracks exposure, enforces `RISK_MAX_EXPOSURE_USDC`, and optionally monitors hedges (hedge logic currently disabled).
 - **Merge task**: Periodically fetches positions, and for markets where you hold both YES and NO, runs `merge_max` to redeem (requires `POLYMARKET_PROXY_ADDRESS` and `MERGE_INTERVAL_MINUTES`).
+
+---
+
+## Bot Workflow
+
+```mermaid
+flowchart TD
+    A[Start Bot] --> B[Initialize Config]
+    B --> C[Load Environment Variables]
+    C --> D[Connect to Polymarket API]
+
+    D --> E[Market Discovery]
+    E --> F[Fetch BTC 5-min Markets]
+    F --> G[Subscribe to Order Book]
+
+    G --> H[Monitor YES/NO Prices]
+    H --> I{YES + NO < Threshold?}
+
+    I -->|No| H
+    I -->|Yes| J[Arbitrage Detected]
+
+    J --> K[Calculate Profit Margin]
+    K --> L{Profit > Min Threshold?}
+
+    L -->|No| H
+    L -->|Yes| M[Execute Trade]
+
+    M --> N[Place YES Order]
+    N --> O[Place NO Order]
+    O --> P[Confirm Fills]
+
+    P --> Q{Risk Limits OK?}
+    Q -->|Yes| R[Update Positions]
+    Q -->|No| S[Skip Trade]
+
+    R --> T[Check Merge Time]
+    T --> U{Merge Interval?}
+    U -->|Yes| V[Merge Positions]
+    U -->|No| E
+    V --> E
+
+    S --> H
+```
+
+### Workflow Description
+
+1. **Initialization**: Bot loads configuration from environment variables and connects to Polymarket API
+2. **Market Discovery**: Fetches active BTC 5-minute "Up/Down" markets
+3. **Order Book Monitoring**: Subscribes to real-time order book updates
+4. **Arbitrage Detection**: Continuously checks if YES + NO prices create arbitrage opportunity
+5. **Trade Execution**: Places simultaneous YES and NO orders when opportunity detected
+6. **Risk Management**: Validates against exposure limits before executing
+7. **Position Merge**: Periodically merges redeemable positions to reclaim funds
 
 ---
 
